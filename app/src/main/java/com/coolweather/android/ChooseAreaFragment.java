@@ -12,16 +12,23 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ListView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.coolweather.android.db.City;
 import com.coolweather.android.db.County;
 import com.coolweather.android.db.Province;
+import com.coolweather.android.util.HttpUtil;
+import com.coolweather.android.util.Utility;
 
 import org.litepal.crud.DataSupport;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.HttpUrl;
 import okhttp3.Response;
 
 public class ChooseAreaFragment extends Fragment {
@@ -61,6 +68,7 @@ public class ChooseAreaFragment extends Fragment {
     //选中的级别
     private int currentLevel;
 
+    //获取到了一些控件的实例，然后去初始化了ArrayAdapter，并将它设置为ListView的适配器
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState){
@@ -79,6 +87,7 @@ public class ChooseAreaFragment extends Fragment {
         return view;
     }
 
+    //给ListView和Button设置了点击事件
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
 
@@ -107,18 +116,20 @@ public class ChooseAreaFragment extends Fragment {
                 }
             }
         });
-        queryProvinces();
+        queryProvinces();//加载省 级数据
     }
 
     //查询全国所有的省，优先从数据库查询，如果没有查询到再去服务器上查询
     private void queryProvinces() {
         titleText.setText("中国");
-
+        //将头布局的标题设置成中国
         backButton.setVisibility(View.GONE);
+        //影藏返回按钮，这个方法是显示全国省份，所以不会有返回上级的按钮
 
         provinceList = DataSupport.findAll(Province.class);
+        //然后调用LitePal的查询接口来从数据库中读取省级数据
 
-        if (provinceList.size() > 0){
+        if (provinceList.size() > 0){//如果数据库中有数据，则读取出来
             dataList.clear();
 
             for (Province province:provinceList){
@@ -128,9 +139,9 @@ public class ChooseAreaFragment extends Fragment {
             adapter.notifyDataSetChanged();
 
             listView.setSelection(0);
-
+            //显示到界面上
             currentLevel = LEVEL_PROVINCE;
-        }else {
+        }else {//如果数据库中没有省级数据，则调用方法从服务器查询
             String address = "http://guolin.tech/api/china";
 
             queryFromServer(address,"province");
@@ -144,7 +155,7 @@ public class ChooseAreaFragment extends Fragment {
         titleText.setText(selectedProvince.getProvinceName());
 
         backButton.setVisibility(View.VISIBLE);
-
+        //显示返回按钮，可以返回上一级从新选择省
         cityList = DataSupport.where("provinceid =?",
                 String.valueOf(selectedProvince.getId())).find(City.class);
 
@@ -205,10 +216,72 @@ public class ChooseAreaFragment extends Fragment {
 
     //根据传入的地址和类型从服务器上查询省市县数据
     private void queryFromServer(String address,final  String type){
+        showProgressDialog();
 
+        HttpUtil.sendOkHttpRequset(address, new Callback() {//调用方法查询数据库
+            @Override
+            public void onFailure(Call call, IOException e) {
+                //通过runOnUiThread()方法回到主线程处理逻辑
+                getActivity().runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        closeProgressDialog();
+                        Toast.makeText(getContext(),"加载失败",Toast.LENGTH_SHORT).show();
+                    }
+                });
+
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                String responseText = response.body().string();
+
+                boolean result = false;
+
+                if ("province".equals(type)){
+                    result = Utility.handleProvinceResponse(responseText);
+                }else if ("city".equals(type)){
+                    result = Utility.handleCityResponse(responseText,selectedProvince.getId());
+                }else if ("county".equals(type)){
+                    Utility.handleCountyResponse(responseText,selectedCity.getId());
+                }
+
+                if (result){
+                    getActivity().runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            closeProgressDialog();
+
+                            if ("province".equals(type)){
+                                queryProvinces();
+                            }else if ("city".equals(type)){
+                                queryCities();
+                            }else if ("county".equals(type)){
+                                queryCounties();
+                            }
+                        }
+                    });
+                }
+            }
+        });
     }
 
+    //关闭进度对话框
+    private void closeProgressDialog() {
+        if (progressDialog != null){
+            progressDialog.dismiss();
+        }
+    }
 
+    //显示进度对话框
+    private void showProgressDialog() {
+        if (progressDialog == null){
+            progressDialog = new ProgressDialog(getActivity());
+            progressDialog.setMessage("正在加载...");
+            progressDialog.setCanceledOnTouchOutside(false);
+        }
+        progressDialog.show();
+    }
 
 
 }
