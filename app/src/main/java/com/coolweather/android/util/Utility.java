@@ -1,10 +1,13 @@
 package com.coolweather.android.util;
 
 import android.text.TextUtils;
+import android.util.Log;
 
 import com.coolweather.android.db.City;
 import com.coolweather.android.db.County;
 import com.coolweather.android.db.Province;
+import com.coolweather.android.gosn.Weather;
+import com.google.gson.Gson;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -82,4 +85,29 @@ public class Utility {
     * 先使用JSONArray和JSONObject将数据解析出来，然后组装成实体类对象，再调用save() 方法
     * 将数据存储到数据库当中。由于这里的JSON数据结构比较简单，我们就不使用GSON来进行解析了
     * */
+
+
+
+    //将返回的json数据解析成weather实体类
+    public static Weather handleWeatherResponse(String response){
+        Log.d("kunwu","传入方法中待转换的数据111"+response);
+        try {
+            JSONObject jsonObject = new JSONObject(response);
+            Log.d("kunwu","传入方法中待转换的数据"+response);
+            JSONArray jsonArray = jsonObject.getJSONArray("HeWeather");
+            Log.d("kunwu","转换后的数据"+jsonArray.getJSONObject(0).toString());
+            String weatherContent = jsonArray.getJSONObject(0).toString();
+            //上面将 数据解析出来，下面一句直接通过方法将json数据转换成Weather对象
+            Log.d("kunwu",weatherContent);
+            Weather weather = new Gson().fromJson(weatherContent,Weather.class);
+
+            Log.d("kunwu",weather.status);
+
+            return weather;
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
 }
