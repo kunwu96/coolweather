@@ -267,7 +267,7 @@ public class ChooseAreaFragment extends Fragment {
                 }else if ("city".equals(type)){
                     result = Utility.handleCityResponse(responseText,selectedProvince.getId());
                 }else if ("county".equals(type)){
-                    Utility.handleCountyResponse(responseText,selectedCity.getId());
+                    result =  Utility.handleCountyResponse(responseText,selectedCity.getId());
                 }
 
                 if (result){
